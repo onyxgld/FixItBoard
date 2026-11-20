@@ -3,16 +3,19 @@ package com.group.fixitboard;
 import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.Typeface;
+import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.view.Gravity;
 import android.view.View;
+import android.widget.Button;
 import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.cardview.widget.CardView;
 import androidx.core.content.ContextCompat;
@@ -51,6 +54,7 @@ public class NotificationsHistoryActivity extends AppCompatActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        ThemeHelper.applySavedTheme(this);
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_notifications_history);
 
@@ -62,16 +66,12 @@ public class NotificationsHistoryActivity extends AppCompatActivity {
 
         btnBack.setOnClickListener(v -> finish());
 
-        tvMarkAllRead.setOnClickListener(v -> {
-            for (NotificationItem item : notifications) {
-                if (item.unread && item.docId != null) {
-                    db.collection("notifications").document(item.docId).update("unread", false);
-                }
-                item.unread = false;
-            }
-            renderNotifications();
-            Toast.makeText(this, "All notifications marked as read", Toast.LENGTH_SHORT).show();
-        });
+        // Transform top-right action into Figma three-dots menu (⋮)
+        tvMarkAllRead.setText("⋮");
+        tvMarkAllRead.setTextSize(22f);
+        int padDots = (int) (10 * getResources().getDisplayMetrics().density);
+        tvMarkAllRead.setPadding(padDots, padDots / 2, padDots / 2, padDots / 2);
+        tvMarkAllRead.setOnClickListener(v -> showMarkAllReadModal());
 
         LinearLayout navHome = findViewById(R.id.navHome);
         LinearLayout navRequests = findViewById(R.id.navRequests);
@@ -97,6 +97,84 @@ public class NotificationsHistoryActivity extends AppCompatActivity {
         });
 
         listenToNotifications();
+    }
+
+    private void showMarkAllReadModal() {
+        float d = getResources().getDisplayMetrics().density;
+        int navy = ContextCompat.getColor(this, R.color.navy_primary);
+        int cardBg = ContextCompat.getColor(this, R.color.white);
+        int textPrimary = ContextCompat.getColor(this, R.color.text_primary);
+
+        LinearLayout modalBox = new LinearLayout(this);
+        modalBox.setOrientation(LinearLayout.VERTICAL);
+        int pad = (int) (24 * d);
+        modalBox.setPadding(pad, pad, pad, pad);
+
+        GradientDrawable boxBg = new GradientDrawable();
+        boxBg.setCornerRadius(18 * d);
+        boxBg.setColor(cardBg);
+        modalBox.setBackground(boxBg);
+
+        TextView tvTitle = new TextView(this);
+        tvTitle.setText("Notifications");
+        tvTitle.setTextColor(navy);
+        tvTitle.setTextSize(20f);
+        tvTitle.setTypeface(null, Typeface.BOLD);
+        modalBox.addView(tvTitle);
+
+        TextView tvBody = new TextView(this);
+        tvBody.setText("Mark all visible notifications as read?");
+        tvBody.setTextColor(textPrimary);
+        tvBody.setTextSize(14f);
+        LinearLayout.LayoutParams bodyLp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        bodyLp.topMargin = (int) (14 * d);
+        bodyLp.bottomMargin = (int) (26 * d);
+        tvBody.setLayoutParams(bodyLp);
+        modalBox.addView(tvBody);
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setView(modalBox)
+                .create();
+
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+        }
+
+        TextView tvCancel = new TextView(this);
+        tvCancel.setText("Cancel");
+        tvCancel.setTextColor(navy);
+        tvCancel.setTextSize(14f);
+        tvCancel.setTypeface(null, Typeface.BOLD);
+        tvCancel.setGravity(Gravity.CENTER);
+        tvCancel.setPadding(0, (int) (10 * d), 0, (int) (12 * d));
+        tvCancel.setOnClickListener(v -> dialog.dismiss());
+        modalBox.addView(tvCancel);
+
+        Button btnConfirm = new Button(this);
+        btnConfirm.setText("Mark all as read");
+        btnConfirm.setAllCaps(false);
+        btnConfirm.setTextSize(14.5f);
+        btnConfirm.setTypeface(null, Typeface.BOLD);
+        btnConfirm.setTextColor(ThemeHelper.isDarkMode(this) ? Color.parseColor("#0C1728") : Color.WHITE);
+        btnConfirm.setBackgroundTintList(android.content.res.ColorStateList.valueOf(navy));
+        LinearLayout.LayoutParams btnLp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, (int) (46 * d));
+        btnConfirm.setLayoutParams(btnLp);
+        btnConfirm.setOnClickListener(v -> {
+            dialog.dismiss();
+            for (NotificationItem item : notifications) {
+                if (item.unread && item.docId != null) {
+                    db.collection("notifications").document(item.docId).update("unread", false);
+                }
+                item.unread = false;
+            }
+            renderNotifications();
+            Toast.makeText(this, "All notifications marked as read", Toast.LENGTH_SHORT).show();
+        });
+        modalBox.addView(btnConfirm);
+
+        dialog.show();
     }
 
     private void listenToNotifications() {
@@ -147,6 +225,7 @@ public class NotificationsHistoryActivity extends AppCompatActivity {
 
     private void renderNotifications() {
         containerNotifications.removeAllViews();
+        float d = getResources().getDisplayMetrics().density;
 
         if (notifications.isEmpty()) {
             TextView tvEmpty = new TextView(this);
@@ -154,11 +233,26 @@ public class NotificationsHistoryActivity extends AppCompatActivity {
             tvEmpty.setTextColor(ContextCompat.getColor(this, R.color.text_gray));
             tvEmpty.setTextSize(14f);
             tvEmpty.setGravity(Gravity.CENTER);
-            int pad = (int) (32 * getResources().getDisplayMetrics().density);
+            int pad = (int) (32 * d);
             tvEmpty.setPadding(pad, pad, pad, pad);
             containerNotifications.addView(tvEmpty);
             return;
         }
+
+        int unreadCount = 0;
+        for (NotificationItem item : notifications) {
+            if (item.unread) unreadCount++;
+        }
+
+        TextView tvUnreadCount = new TextView(this);
+        tvUnreadCount.setText(unreadCount + " unread notification" + (unreadCount == 1 ? "" : "s"));
+        tvUnreadCount.setTextColor(ContextCompat.getColor(this, R.color.text_gray));
+        tvUnreadCount.setTextSize(12.5f);
+        LinearLayout.LayoutParams countLp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        countLp.bottomMargin = (int) (12 * d);
+        tvUnreadCount.setLayoutParams(countLp);
+        containerNotifications.addView(tvUnreadCount);
 
         for (NotificationItem item : notifications) {
             containerNotifications.addView(createNotificationCard(item));
@@ -169,6 +263,10 @@ public class NotificationsHistoryActivity extends AppCompatActivity {
         float d = getResources().getDisplayMetrics().density;
         int navy = ContextCompat.getColor(this, R.color.navy_primary);
         int gray = ContextCompat.getColor(this, R.color.text_gray);
+        int cardReadBg = ContextCompat.getColor(this, R.color.white);
+        int cardUnreadBg = ThemeHelper.isDarkMode(this)
+                ? Color.parseColor("#1E314E")
+                : Color.parseColor("#F0F5FF");
 
         CardView card = new CardView(this);
         LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(
@@ -176,7 +274,7 @@ public class NotificationsHistoryActivity extends AppCompatActivity {
                 LinearLayout.LayoutParams.WRAP_CONTENT);
         cardParams.bottomMargin = (int) (12 * d);
         card.setLayoutParams(cardParams);
-        card.setCardBackgroundColor(item.unread ? Color.parseColor("#F0F5FF") : Color.WHITE);
+        card.setCardBackgroundColor(item.unread ? cardUnreadBg : cardReadBg);
         card.setRadius(12 * d);
         card.setCardElevation(2 * d);
 
@@ -236,12 +334,24 @@ public class NotificationsHistoryActivity extends AppCompatActivity {
         tvMsg.setLayoutParams(msgParams);
         inner.addView(tvMsg);
 
+        RelativeLayout bottomRow = new RelativeLayout(this);
+
         TextView tvTime = new TextView(this);
         tvTime.setText(item.time);
         tvTime.setTextColor(gray);
         tvTime.setTextSize(11f);
-        inner.addView(tvTime);
+        bottomRow.addView(tvTime);
 
+        TextView tvChevron = new TextView(this);
+        tvChevron.setText("›");
+        tvChevron.setTextColor(navy);
+        tvChevron.setTextSize(18f);
+        RelativeLayout.LayoutParams chevLp = new RelativeLayout.LayoutParams(
+                RelativeLayout.LayoutParams.WRAP_CONTENT, RelativeLayout.LayoutParams.WRAP_CONTENT);
+        chevLp.addRule(RelativeLayout.ALIGN_PARENT_END);
+        bottomRow.addView(tvChevron, chevLp);
+
+        inner.addView(bottomRow);
         card.addView(inner);
 
         card.setOnClickListener(v -> {

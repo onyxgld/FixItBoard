@@ -1,20 +1,27 @@
 package com.group.fixitboard;
 
 import android.content.Intent;
+import android.graphics.Color;
 import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.text.InputType;
+import android.view.Gravity;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
 
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
@@ -30,7 +37,7 @@ public class TenantLoginActivity extends AppCompatActivity {
 
     private TextView tvHeaderTitle, tvTabLogin, tvTabRegister, tvForgotPassword, tvSwitchPrompt, tvSwitchAction;
     private View indicatorLogin, indicatorRegister;
-    private EditText etFullName, etEmail, etPassword;
+    private EditText etFullName, etPropertyCode, etEmail, etPassword;
     private Button btnSubmitAuth;
 
     private FirebaseAuth mAuth;
@@ -38,6 +45,7 @@ public class TenantLoginActivity extends AppCompatActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        ThemeHelper.applySavedTheme(this);
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_tenant_login);
 
@@ -64,13 +72,19 @@ public class TenantLoginActivity extends AppCompatActivity {
         tvSwitchPrompt = findViewById(R.id.tvSwitchPrompt);
         tvSwitchAction = findViewById(R.id.tvSwitchAction);
 
+        injectPropertyCodeField();
+
         btnBack.setOnClickListener(v -> finish());
 
         tabLogin.setOnClickListener(v -> switchMode(true));
         tabRegister.setOnClickListener(v -> switchMode(false));
         tvSwitchAction.setOnClickListener(v -> switchMode(!isLoginMode));
 
-        tvForgotPassword.setOnClickListener(v -> showForgotPasswordDialog());
+        tvForgotPassword.setOnClickListener(v -> {
+            Intent intent = new Intent(this, ForgotPasswordActivity.class);
+            intent.putExtra("PREFILL_EMAIL", etEmail.getText().toString().trim());
+            startActivity(intent);
+        });
 
         btnSubmitAuth.setOnClickListener(v -> handleAuthSubmit());
 
@@ -78,32 +92,29 @@ public class TenantLoginActivity extends AppCompatActivity {
                 Toast.makeText(this, "Please sign in with your registered Tenant Email & Password.", Toast.LENGTH_SHORT).show());
     }
 
-    private void showForgotPasswordDialog() {
-        EditText etResetEmail = new EditText(this);
-        etResetEmail.setHint("Enter your registered email");
-        etResetEmail.setInputType(InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);
-        etResetEmail.setText(etEmail.getText().toString().trim());
-        int pad = (int) (18 * getResources().getDisplayMetrics().density);
-        etResetEmail.setPadding(pad, pad, pad, pad);
+    private void injectPropertyCodeField() {
+        if (etEmail == null || !(etEmail.getParent() instanceof ViewGroup)) return;
+        ViewGroup parent = (ViewGroup) etEmail.getParent();
+        float d = getResources().getDisplayMetrics().density;
 
-        new AlertDialog.Builder(this)
-                .setTitle("Reset Password")
-                .setMessage("We will send a password reset link to your email address.")
-                .setView(etResetEmail)
-                .setPositiveButton("Send Link", (dialog, which) -> {
-                    String resetEmail = etResetEmail.getText().toString().trim();
-                    if (resetEmail.isEmpty()) {
-                        Toast.makeText(this, "Please enter an email address.", Toast.LENGTH_SHORT).show();
-                        return;
-                    }
-                    mAuth.sendPasswordResetEmail(resetEmail)
-                            .addOnSuccessListener(unused ->
-                                    Toast.makeText(this, "Password reset link sent to " + resetEmail, Toast.LENGTH_LONG).show())
-                            .addOnFailureListener(e ->
-                                    Toast.makeText(this, "Error: " + e.getMessage(), Toast.LENGTH_SHORT).show());
-                })
-                .setNegativeButton("Cancel", null)
-                .show();
+        etPropertyCode = new EditText(this);
+        etPropertyCode.setHint("Property / invitation code (e.g., Unit 2A)");
+        etPropertyCode.setHintTextColor(ContextCompat.getColor(this, R.color.text_gray));
+        etPropertyCode.setTextColor(ContextCompat.getColor(this, R.color.text_primary));
+        etPropertyCode.setTextSize(14f);
+        etPropertyCode.setInputType(InputType.TYPE_CLASS_TEXT);
+        etPropertyCode.setBackgroundResource(R.drawable.bg_input_outline);
+        int padH = (int) (14 * d);
+        etPropertyCode.setPadding(padH, 0, padH, 0);
+
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, (int) (48 * d));
+        lp.bottomMargin = (int) (12 * d);
+        etPropertyCode.setLayoutParams(lp);
+        etPropertyCode.setVisibility(View.GONE);
+
+        int emailIdx = parent.indexOfChild(etEmail);
+        parent.addView(etPropertyCode, emailIdx + 1);
     }
 
     private void switchMode(boolean loginMode) {
@@ -125,12 +136,13 @@ public class TenantLoginActivity extends AppCompatActivity {
             indicatorRegister.setBackgroundColor(slateLightColor);
 
             etFullName.setVisibility(View.GONE);
+            if (etPropertyCode != null) etPropertyCode.setVisibility(View.GONE);
             tvForgotPassword.setVisibility(View.VISIBLE);
             btnSubmitAuth.setText("Log In");
             tvSwitchPrompt.setText("Don't have an account? ");
             tvSwitchAction.setText("Register");
         } else {
-            tvHeaderTitle.setText("Tenant Register");
+            tvHeaderTitle.setText("Create an account");
 
             tvTabRegister.setTextColor(navyColor);
             tvTabRegister.setTypeface(null, Typeface.BOLD);
@@ -141,10 +153,11 @@ public class TenantLoginActivity extends AppCompatActivity {
             indicatorLogin.setBackgroundColor(slateLightColor);
 
             etFullName.setVisibility(View.VISIBLE);
+            if (etPropertyCode != null) etPropertyCode.setVisibility(View.VISIBLE);
             tvForgotPassword.setVisibility(View.GONE);
-            btnSubmitAuth.setText("Register");
+            btnSubmitAuth.setText("Create account");
             tvSwitchPrompt.setText("Already have an account? ");
-            tvSwitchAction.setText("Log In");
+            tvSwitchAction.setText("Log in instead");
         }
     }
 
@@ -152,9 +165,10 @@ public class TenantLoginActivity extends AppCompatActivity {
         String email = etEmail.getText().toString().trim();
         String password = etPassword.getText().toString().trim();
         String fullName = etFullName.getText().toString().trim();
+        String propertyCode = etPropertyCode != null ? etPropertyCode.getText().toString().trim() : "";
 
         if (!isLoginMode && fullName.isEmpty()) {
-            etFullName.setError("Please enter your full name and unit");
+            etFullName.setError("Please enter your full name");
             etFullName.requestFocus();
             return;
         }
@@ -197,6 +211,7 @@ public class TenantLoginActivity extends AppCompatActivity {
             mAuth.createUserWithEmailAndPassword(email, password)
                     .addOnSuccessListener(authResult -> {
                         FirebaseUser user = authResult.getUser();
+                        String assignedUnit = propertyCode.isEmpty() ? "Unassigned" : propertyCode;
                         if (user != null) {
                             UserProfileChangeRequest profileUpdates = new UserProfileChangeRequest.Builder()
                                     .setDisplayName(fullName)
@@ -208,20 +223,144 @@ public class TenantLoginActivity extends AppCompatActivity {
                             userDoc.put("name", fullName);
                             userDoc.put("email", email);
                             userDoc.put("role", "tenant");
-                            userDoc.put("unit", "Unassigned");
+                            userDoc.put("unit", assignedUnit);
+                            userDoc.put("propertyCode", propertyCode);
                             userDoc.put("contact", "");
 
                             db.collection("users").document(user.getUid()).set(userDoc);
                         }
-                        Toast.makeText(this, "Account created!", Toast.LENGTH_SHORT).show();
-                        goToTenantDashboard(fullName);
+                        showRegistrationSuccessView(fullName, email, assignedUnit);
                     })
                     .addOnFailureListener(e -> {
                         btnSubmitAuth.setEnabled(true);
-                        btnSubmitAuth.setText("Register");
+                        btnSubmitAuth.setText("Create account");
                         Toast.makeText(this, "Registration failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
                     });
         }
+    }
+
+    private void showRegistrationSuccessView(String fullName, String email, String unit) {
+        float d = getResources().getDisplayMetrics().density;
+        int navy = ContextCompat.getColor(this, R.color.navy_primary);
+        int bgSlate = ContextCompat.getColor(this, R.color.slate_bg);
+        int cardBg = ContextCompat.getColor(this, R.color.white);
+        int textPrimary = ContextCompat.getColor(this, R.color.text_primary);
+        int textGray = ContextCompat.getColor(this, R.color.text_gray);
+
+        ScrollView scrollView = new ScrollView(this);
+        scrollView.setBackgroundColor(bgSlate);
+        scrollView.setFillViewport(true);
+        scrollView.setFitsSystemWindows(true);
+
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        int pad = (int) (22 * d);
+        root.setPadding(pad, pad, pad, pad);
+        scrollView.addView(root);
+
+        // Top Bar
+        LinearLayout topBar = new LinearLayout(this);
+        topBar.setOrientation(LinearLayout.HORIZONTAL);
+        topBar.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams topLp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        topLp.bottomMargin = (int) (24 * d);
+        topBar.setLayoutParams(topLp);
+
+        TextView tvBrand = new TextView(this);
+        tvBrand.setText("FIXIT BOARD");
+        tvBrand.setTextColor(navy);
+        tvBrand.setTextSize(18f);
+        tvBrand.setTypeface(null, Typeface.BOLD);
+        topBar.addView(tvBrand);
+        root.addView(topBar);
+
+        // Card Container
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        int cardPad = (int) (24 * d);
+        card.setPadding(cardPad, cardPad, cardPad, cardPad);
+        GradientDrawable cardDrawable = new GradientDrawable();
+        cardDrawable.setCornerRadius(16 * d);
+        cardDrawable.setColor(cardBg);
+        cardDrawable.setStroke((int) (1 * d), ContextCompat.getColor(this, R.color.slate_light));
+        card.setBackground(cardDrawable);
+
+        TextView tvTitle = new TextView(this);
+        tvTitle.setText("Account created");
+        tvTitle.setTextColor(navy);
+        tvTitle.setTextSize(22f);
+        tvTitle.setTypeface(null, Typeface.BOLD);
+        card.addView(tvTitle);
+
+        TextView tvSub = new TextView(this);
+        tvSub.setText("Your tenant account is ready.");
+        tvSub.setTextColor(textGray);
+        tvSub.setTextSize(13.5f);
+        LinearLayout.LayoutParams subLp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        subLp.topMargin = (int) (4 * d);
+        subLp.bottomMargin = (int) (20 * d);
+        tvSub.setLayoutParams(subLp);
+        card.addView(tvSub);
+
+        TextView tvComplete = new TextView(this);
+        tvComplete.setText("Registration complete");
+        tvComplete.setTextColor(navy);
+        tvComplete.setTextSize(15f);
+        tvComplete.setTypeface(null, Typeface.BOLD);
+        card.addView(tvComplete);
+
+        TextView tvDetails = new TextView(this);
+        tvDetails.setText("Welcome, " + fullName + " (" + email + ").\nAssigned Unit: " + unit + ".");
+        tvDetails.setTextColor(textPrimary);
+        tvDetails.setTextSize(13.5f);
+        LinearLayout.LayoutParams detLp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        detLp.topMargin = (int) (8 * d);
+        detLp.bottomMargin = (int) (28 * d);
+        tvDetails.setLayoutParams(detLp);
+        card.addView(tvDetails);
+
+        Button btnContinue = new Button(this);
+        btnContinue.setText("Continue to dashboard");
+        btnContinue.setAllCaps(false);
+        btnContinue.setTextColor(ThemeHelper.isDarkMode(this) ? Color.parseColor("#0C1728") : Color.WHITE);
+        btnContinue.setTextSize(14.5f);
+        btnContinue.setTypeface(null, Typeface.BOLD);
+        btnContinue.setBackgroundTintList(android.content.res.ColorStateList.valueOf(navy));
+        LinearLayout.LayoutParams contLp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, (int) (48 * d));
+        contLp.bottomMargin = (int) (12 * d);
+        btnContinue.setLayoutParams(contLp);
+        btnContinue.setOnClickListener(v -> goToTenantDashboard(fullName));
+        card.addView(btnContinue);
+
+        Button btnBackLogin = new Button(this);
+        btnBackLogin.setText("Back to log in");
+        btnBackLogin.setAllCaps(false);
+        btnBackLogin.setTextColor(navy);
+        btnBackLogin.setTextSize(14f);
+        btnBackLogin.setTypeface(null, Typeface.BOLD);
+        btnBackLogin.setBackgroundResource(R.drawable.bg_input_outline);
+        btnBackLogin.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, (int) (46 * d)));
+        btnBackLogin.setOnClickListener(v -> {
+            FirebaseAuth.getInstance().signOut();
+            recreate();
+        });
+        card.addView(btnBackLogin);
+
+        root.addView(card);
+
+        ViewCompat.setOnApplyWindowInsetsListener(root, (v, windowInsets) -> {
+            Insets insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars());
+            int basePad = (int) (22 * getResources().getDisplayMetrics().density);
+            v.setPadding(basePad + insets.left, basePad + insets.top, basePad + insets.right, basePad + insets.bottom);
+            return windowInsets;
+        });
+
+        setContentView(scrollView);
     }
 
     public static String resolveTenantDisplayName(FirebaseUser user, String email) {

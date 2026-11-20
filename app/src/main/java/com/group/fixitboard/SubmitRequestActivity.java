@@ -40,7 +40,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Random;
 
 public class SubmitRequestActivity extends AppCompatActivity {
 
@@ -63,12 +62,15 @@ public class SubmitRequestActivity extends AppCompatActivity {
                     String encoded = encodeUriToBase64(uri);
                     if (encoded != null) {
                         selectedPhotoBase64Map.put(activePhotoSlot.getId(), encoded);
+                    } else {
+                        Toast.makeText(this, "Could not process selected image.", Toast.LENGTH_SHORT).show();
                     }
                 }
             });
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        ThemeHelper.applySavedTheme(this);
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_submit_request);
 
@@ -113,11 +115,27 @@ public class SubmitRequestActivity extends AppCompatActivity {
     }
 
     private String encodeUriToBase64(Uri uri) {
-        try (InputStream is = getContentResolver().openInputStream(uri)) {
-            Bitmap original = BitmapFactory.decodeStream(is);
-            if (original == null) return null;
+        try {
+            BitmapFactory.Options bounds = new BitmapFactory.Options();
+            bounds.inJustDecodeBounds = true;
+            try (InputStream isBounds = getContentResolver().openInputStream(uri)) {
+                BitmapFactory.decodeStream(isBounds, null, bounds);
+            }
 
             int maxDim = 600;
+            int sampleSize = 1;
+            while ((bounds.outWidth / sampleSize) > maxDim * 2 || (bounds.outHeight / sampleSize) > maxDim * 2) {
+                sampleSize *= 2;
+            }
+
+            BitmapFactory.Options decodeOpts = new BitmapFactory.Options();
+            decodeOpts.inSampleSize = sampleSize;
+            Bitmap original;
+            try (InputStream is = getContentResolver().openInputStream(uri)) {
+                original = BitmapFactory.decodeStream(is, null, decodeOpts);
+            }
+            if (original == null) return null;
+
             int w = original.getWidth();
             int h = original.getHeight();
             float scale = Math.min((float) maxDim / w, (float) maxDim / h);
@@ -208,7 +226,6 @@ public class SubmitRequestActivity extends AppCompatActivity {
             String reqId = String.format(Locale.US, "#REQ-%05d", nextNum);
             commitNewRequest(reqId, tenantUid, tenantUnit, problemType, location, description);
         }).addOnFailureListener(e -> {
-            // Fallback count if offline
             db.collection("requests").get().addOnSuccessListener(s -> {
                 String reqId = String.format(Locale.US, "#REQ-%05d", s.size() + 1);
                 commitNewRequest(reqId, tenantUid, tenantUnit, problemType, location, description);
@@ -293,7 +310,7 @@ public class SubmitRequestActivity extends AppCompatActivity {
         Button btnViewRequest = new Button(this);
         btnViewRequest.setText("View request");
         btnViewRequest.setAllCaps(false);
-        btnViewRequest.setTextColor(Color.WHITE);
+        btnViewRequest.setTextColor(ThemeHelper.isDarkMode(this) ? Color.parseColor("#0C1728") : Color.WHITE);
         btnViewRequest.setBackgroundTintList(android.content.res.ColorStateList.valueOf(navyColor));
         btnViewRequest.setLayoutParams(new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,

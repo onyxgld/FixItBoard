@@ -95,6 +95,18 @@
             android:name=".AdminPropertyManagementActivity"
             android:exported="false"
             android:windowSoftInputMode="adjustResize" />
+        <activity
+            android:name=".AccountSecurityActivity"
+            android:exported="false" />
+        <activity
+            android:name=".AppPreferencesActivity"
+            android:exported="false" />
+        <activity
+            android:name=".TenantNotificationSettingsActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ForgotPasswordActivity"
+            android:exported="false" />
     </application>
 
 </manifest>

@@ -31,6 +31,7 @@ import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
 
+import java.io.InputStream;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.HashMap;
@@ -60,6 +61,7 @@ public class RequestDetailsActivity extends AppCompatActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        ThemeHelper.applySavedTheme(this);
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_request_details);
 
@@ -369,21 +371,42 @@ public class RequestDetailsActivity extends AppCompatActivity {
     }
 
     private void bindPhotoIntoImageView(ImageView iv, String data) {
-        if (iv == null || data == null || data.isEmpty()) return;
+        if (iv == null || data == null || data.trim().isEmpty()) return;
         iv.setImageTintList(null);
         iv.setColorFilter(null);
         iv.setScaleType(ImageView.ScaleType.CENTER_CROP);
         iv.setPadding(0, 0, 0, 0);
 
-        if (data.startsWith("content://") || data.startsWith("file://")) {
-            iv.setImageURI(Uri.parse(data));
-        } else {
-            try {
-                byte[] bytes = Base64.decode(data, Base64.DEFAULT);
-                Bitmap bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
-                if (bmp != null) iv.setImageBitmap(bmp);
+        String trimmed = data.trim();
+
+        if (trimmed.startsWith("content://") || trimmed.startsWith("file://")) {
+            try (InputStream is = getContentResolver().openInputStream(Uri.parse(trimmed))) {
+                Bitmap bmp = BitmapFactory.decodeStream(is);
+                if (bmp != null) {
+                    iv.setImageBitmap(bmp);
+                    return;
+                }
             } catch (Exception ignored) {
             }
+            iv.setScaleType(ImageView.ScaleType.CENTER);
+            iv.setImageResource(android.R.drawable.ic_menu_gallery);
+            iv.setColorFilter(ContextCompat.getColor(this, R.color.navy_primary));
+        } else {
+            try {
+                String cleanBase64 = trimmed.contains(",")
+                        ? trimmed.substring(trimmed.indexOf(",") + 1)
+                        : trimmed;
+                byte[] bytes = Base64.decode(cleanBase64, Base64.DEFAULT);
+                Bitmap bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+                if (bmp != null) {
+                    iv.setImageBitmap(bmp);
+                    return;
+                }
+            } catch (Exception ignored) {
+            }
+            iv.setScaleType(ImageView.ScaleType.CENTER);
+            iv.setImageResource(android.R.drawable.ic_menu_gallery);
+            iv.setColorFilter(ContextCompat.getColor(this, R.color.navy_primary));
         }
     }
 
