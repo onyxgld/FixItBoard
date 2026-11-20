@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+
+    <!-- FixItBoard Brand Colors -->
+    <color name="navy_primary">#1B3258</color>
+    <color name="navy_dark">#12223D</color>
+    <color name="slate_bg">#F5F7FA</color>
+    <color name="slate_light">#E8EEF5</color>
+    <color name="text_primary">#1A1C1E</color>
+    <color name="text_gray">#616161</color>
+
+    <!-- Status Badges (Pending, In Progress, Completed) -->
+    <color name="status_pending_bg">#FFF8E1</color>
+    <color name="status_pending_text">#F57F17</color>
+    <color name="status_progress_bg">#E3F2FD</color>
+    <color name="status_progress_text">#1565C0</color>
+    <color name="status_completed_bg">#E8F5E9</color>
+    <color name="status_completed_text">#2E7D32</color>
+</resources>
