@@ -180,6 +180,7 @@
         android:fillViewport="true">
 
         <LinearLayout
+            android:id="@+id/layoutDetailsContent"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
@@ -195,7 +196,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_centerVertical="true"
-                    android:text="#REQ-00023"
+                    android:text="#REQ-00001"
                     android:textColor="@color/navy_primary"
                     android:textSize="17sp"
                     android:textStyle="bold" />
@@ -209,7 +210,7 @@
                     android:background="#FFF3E0"
                     android:paddingHorizontal="12dp"
                     android:paddingVertical="4dp"
-                    android:text="In Progress"
+                    android:text="Pending"
                     android:textColor="#E65100"
                     android:textSize="12sp"
                     android:textStyle="bold" />
@@ -229,7 +230,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
                 android:layout_marginBottom="12dp"
-                android:text="Plumbing"
+                android:text="Loading..."
                 android:textColor="@color/text_gray"
                 android:textSize="14sp" />
 
@@ -247,7 +248,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
                 android:layout_marginBottom="12dp"
-                android:text="Kitchen"
+                android:text="Loading..."
                 android:textColor="@color/text_gray"
                 android:textSize="14sp" />
 
@@ -266,15 +267,16 @@
                 android:layout_marginTop="2dp"
                 android:layout_marginBottom="16dp"
                 android:lineSpacingExtra="2dp"
-                android:text="Leaky faucet in the sink. Water is dripping even the tap is closed."
+                android:text="Loading..."
                 android:textColor="@color/text_gray"
                 android:textSize="14sp" />
 
             <TextView
+                android:id="@+id/tvPhotosHeader"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="8dp"
-                android:text="Photos"
+                android:text="Photos (Tap to preview)"
                 android:textColor="@color/navy_primary"
                 android:textSize="13sp"
                 android:textStyle="bold" />
@@ -287,6 +289,7 @@
                 android:weightSum="3">
 
                 <ImageView
+                    android:id="@+id/ivDetailPhoto1"
                     android:layout_width="0dp"
                     android:layout_height="84dp"
                     android:layout_marginEnd="6dp"
@@ -298,6 +301,7 @@
                     app:tint="@color/navy_primary" />
 
                 <ImageView
+                    android:id="@+id/ivDetailPhoto2"
                     android:layout_width="0dp"
                     android:layout_height="84dp"
                     android:layout_marginHorizontal="3dp"
@@ -309,6 +313,7 @@
                     app:tint="@color/navy_primary" />
 
                 <ImageView
+                    android:id="@+id/ivDetailPhoto3"
                     android:layout_width="0dp"
                     android:layout_height="84dp"
                     android:layout_marginStart="6dp"
@@ -338,7 +343,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_alignParentEnd="true"
-                    android:text="Unit-3A"
+                    android:text="Loading..."
                     android:textColor="@color/text_gray"
                     android:textSize="13sp" />
             </RelativeLayout>
@@ -361,10 +366,30 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_alignParentEnd="true"
-                    android:text="Nov 12, 2026 | 8:30 AM"
+                    android:text="Loading..."
                     android:textColor="@color/text_gray"
                     android:textSize="13sp" />
             </RelativeLayout>
+
+            <TextView
+                android:id="@+id/tvLatestUpdateLabel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Latest Update / Admin Note"
+                android:textColor="@color/navy_primary"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/tvLatestUpdateValue"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:layout_marginBottom="14dp"
+                android:textColor="@color/text_gray"
+                android:textSize="13sp"
+                android:visibility="gone" />
 
             <LinearLayout
                 android:id="@+id/layoutAdminControls"
@@ -408,7 +433,7 @@
                     android:id="@+id/etAdminNotes"
                     android:layout_width="match_parent"
                     android:layout_height="76dp"
-                    android:layout_marginBottom="20dp"
+                    android:layout_marginBottom="16dp"
                     android:background="@drawable/bg_input_outline"
                     android:gravity="top|start"
                     android:hint="Add technician or repair notes..."
@@ -416,18 +441,43 @@
                     android:padding="12dp"
                     android:textColor="@color/text_primary"
                     android:textSize="13sp" />
-
-                <Button
-                    android:id="@+id/btnSaveDetails"
-                    android:layout_width="match_parent"
-                    android:layout_height="50dp"
-                    android:backgroundTint="@color/navy_primary"
-                    android:text="Save"
-                    android:textAllCaps="false"
-                    android:textColor="@color/white"
-                    android:textSize="15sp"
-                    android:textStyle="bold" />
             </LinearLayout>
+
+            <Button
+                android:id="@+id/btnViewAttachments"
+                android:layout_width="match_parent"
+                android:layout_height="46dp"
+                android:layout_marginBottom="10dp"
+                android:backgroundTint="@color/white"
+                android:text="View Attached Photos"
+                android:textAllCaps="false"
+                android:textColor="@color/navy_primary"
+                android:textStyle="bold"
+                android:visibility="gone" />
+
+            <Button
+                android:id="@+id/btnRateRepair"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:layout_marginBottom="10dp"
+                android:backgroundTint="#15803D"
+                android:text="Rate Repair"
+                android:textAllCaps="false"
+                android:textColor="@color/white"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:visibility="gone" />
+
+            <Button
+                android:id="@+id/btnSaveDetails"
+                android:layout_width="match_parent"
+                android:layout_height="50dp"
+                android:backgroundTint="@color/navy_primary"
+                android:text="Save"
+                android:textAllCaps="false"
+                android:textColor="@color/white"
+                android:textSize="15sp"
+                android:textStyle="bold" />
 
         </LinearLayout>
     </ScrollView>

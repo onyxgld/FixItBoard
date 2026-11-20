@@ -3,6 +3,7 @@ package com.group.fixitboard;
 import android.content.Intent;
 import android.graphics.Typeface;
 import android.os.Bundle;
+import android.text.InputType;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
@@ -11,6 +12,7 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
 
@@ -68,24 +70,40 @@ public class TenantLoginActivity extends AppCompatActivity {
         tabRegister.setOnClickListener(v -> switchMode(false));
         tvSwitchAction.setOnClickListener(v -> switchMode(!isLoginMode));
 
-        tvForgotPassword.setOnClickListener(v -> {
-            String email = etEmail.getText().toString().trim();
-            if (email.isEmpty()) {
-                etEmail.setError("Enter your email first to reset password");
-                etEmail.requestFocus();
-                return;
-            }
-            mAuth.sendPasswordResetEmail(email)
-                    .addOnSuccessListener(unused ->
-                            Toast.makeText(this, "Password reset link sent to " + email, Toast.LENGTH_SHORT).show())
-                    .addOnFailureListener(e ->
-                            Toast.makeText(this, "Error: " + e.getMessage(), Toast.LENGTH_SHORT).show());
-        });
+        tvForgotPassword.setOnClickListener(v -> showForgotPasswordDialog());
 
         btnSubmitAuth.setOnClickListener(v -> handleAuthSubmit());
 
         btnGoogleAuth.setOnClickListener(v ->
                 Toast.makeText(this, "Please sign in with your registered Tenant Email & Password.", Toast.LENGTH_SHORT).show());
+    }
+
+    private void showForgotPasswordDialog() {
+        EditText etResetEmail = new EditText(this);
+        etResetEmail.setHint("Enter your registered email");
+        etResetEmail.setInputType(InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);
+        etResetEmail.setText(etEmail.getText().toString().trim());
+        int pad = (int) (18 * getResources().getDisplayMetrics().density);
+        etResetEmail.setPadding(pad, pad, pad, pad);
+
+        new AlertDialog.Builder(this)
+                .setTitle("Reset Password")
+                .setMessage("We will send a password reset link to your email address.")
+                .setView(etResetEmail)
+                .setPositiveButton("Send Link", (dialog, which) -> {
+                    String resetEmail = etResetEmail.getText().toString().trim();
+                    if (resetEmail.isEmpty()) {
+                        Toast.makeText(this, "Please enter an email address.", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    mAuth.sendPasswordResetEmail(resetEmail)
+                            .addOnSuccessListener(unused ->
+                                    Toast.makeText(this, "Password reset link sent to " + resetEmail, Toast.LENGTH_LONG).show())
+                            .addOnFailureListener(e ->
+                                    Toast.makeText(this, "Error: " + e.getMessage(), Toast.LENGTH_SHORT).show());
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
     }
 
     private void switchMode(boolean loginMode) {
@@ -153,7 +171,7 @@ public class TenantLoginActivity extends AppCompatActivity {
             return;
         }
 
-        if (email.equalsIgnoreCase("admin@fixitboard.com")) {
+        if (email.toLowerCase().startsWith("admin")) {
             etEmail.setError("Please use the Admin Login portal for admin accounts");
             etEmail.requestFocus();
             return;
@@ -190,6 +208,8 @@ public class TenantLoginActivity extends AppCompatActivity {
                             userDoc.put("name", fullName);
                             userDoc.put("email", email);
                             userDoc.put("role", "tenant");
+                            userDoc.put("unit", "Unassigned");
+                            userDoc.put("contact", "");
 
                             db.collection("users").document(user.getUid()).set(userDoc);
                         }

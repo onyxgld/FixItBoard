@@ -1,6 +1,8 @@
 package com.group.fixitboard;
 
 import android.content.Intent;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.ColorDrawable;
@@ -8,6 +10,7 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
+import android.util.Base64;
 import android.view.Gravity;
 import android.widget.Button;
 import android.widget.EditText;
@@ -28,9 +31,13 @@ import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
 
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Random;
@@ -41,6 +48,7 @@ public class SubmitRequestActivity extends AppCompatActivity {
     private TextView tvCharCount;
     private Button btnSubmitRequest;
     private ImageButton activePhotoSlot;
+    private final Map<Integer, String> selectedPhotoBase64Map = new HashMap<>();
 
     private FirebaseAuth mAuth;
     private FirebaseFirestore db;
@@ -51,6 +59,11 @@ public class SubmitRequestActivity extends AppCompatActivity {
                     activePhotoSlot.setImageTintList(null);
                     activePhotoSlot.setScaleType(ImageView.ScaleType.CENTER_CROP);
                     activePhotoSlot.setImageURI(uri);
+
+                    String encoded = encodeUriToBase64(uri);
+                    if (encoded != null) {
+                        selectedPhotoBase64Map.put(activePhotoSlot.getId(), encoded);
+                    }
                 }
             });
 
@@ -99,6 +112,27 @@ public class SubmitRequestActivity extends AppCompatActivity {
         btnSubmitRequest.setOnClickListener(v -> handleSubmit());
     }
 
+    private String encodeUriToBase64(Uri uri) {
+        try (InputStream is = getContentResolver().openInputStream(uri)) {
+            Bitmap original = BitmapFactory.decodeStream(is);
+            if (original == null) return null;
+
+            int maxDim = 600;
+            int w = original.getWidth();
+            int h = original.getHeight();
+            float scale = Math.min((float) maxDim / w, (float) maxDim / h);
+            Bitmap scaled = scale < 1f
+                    ? Bitmap.createScaledBitmap(original, Math.round(w * scale), Math.round(h * scale), true)
+                    : original;
+
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            scaled.compress(Bitmap.CompressFormat.JPEG, 70, baos);
+            return Base64.encodeToString(baos.toByteArray(), Base64.NO_WRAP);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
     private void handleSubmit() {
         String problemType = etProblemType.getText().toString().trim();
         String location = etLocation.getText().toString().trim();
@@ -128,11 +162,65 @@ public class SubmitRequestActivity extends AppCompatActivity {
         FirebaseUser currentUser = mAuth.getCurrentUser();
         String tenantUid = currentUser != null ? currentUser.getUid() : "guest";
         String tenantEmail = currentUser != null && currentUser.getEmail() != null ? currentUser.getEmail() : "";
-        String tenantUnit = TenantLoginActivity.resolveTenantDisplayName(currentUser, tenantEmail);
+        String fallbackUnit = TenantLoginActivity.resolveTenantDisplayName(currentUser, tenantEmail);
 
-        String reqId = String.format(Locale.US, "#REQ-%05d", 100 + new Random().nextInt(900));
+        if (currentUser != null) {
+            db.collection("users").document(tenantUid).get()
+                    .addOnSuccessListener(doc -> {
+                        String resolvedUnit = fallbackUnit;
+                        if (doc.exists()) {
+                            String name = doc.getString("name");
+                            String unit = doc.getString("unit");
+                            if (name != null && !name.trim().isEmpty()) {
+                                resolvedUnit = name.trim();
+                                if (unit != null && !unit.trim().isEmpty()
+                                        && !"Unassigned".equalsIgnoreCase(unit.trim())
+                                        && !resolvedUnit.toLowerCase().contains(unit.trim().toLowerCase())) {
+                                    resolvedUnit += " - " + unit.trim();
+                                }
+                            }
+                        }
+                        saveRequestToFirestore(tenantUid, resolvedUnit, problemType, location, description);
+                    })
+                    .addOnFailureListener(e ->
+                            saveRequestToFirestore(tenantUid, fallbackUnit, problemType, location, description));
+        } else {
+            saveRequestToFirestore(tenantUid, fallbackUnit, problemType, location, description);
+        }
+    }
+
+    private void saveRequestToFirestore(String tenantUid, String tenantUnit,
+                                        String problemType, String location, String description) {
+        com.google.firebase.firestore.DocumentReference counterRef =
+                db.collection("counters").document("requests");
+
+        db.runTransaction(transaction -> {
+            com.google.firebase.firestore.DocumentSnapshot snap = transaction.get(counterRef);
+            long nextNum = 1L;
+            if (snap.exists() && snap.getLong("lastNumber") != null) {
+                nextNum = snap.getLong("lastNumber") + 1L;
+            }
+            Map<String, Object> counterUpdate = new HashMap<>();
+            counterUpdate.put("lastNumber", nextNum);
+            transaction.set(counterRef, counterUpdate);
+            return nextNum;
+        }).addOnSuccessListener(nextNum -> {
+            String reqId = String.format(Locale.US, "#REQ-%05d", nextNum);
+            commitNewRequest(reqId, tenantUid, tenantUnit, problemType, location, description);
+        }).addOnFailureListener(e -> {
+            // Fallback count if offline
+            db.collection("requests").get().addOnSuccessListener(s -> {
+                String reqId = String.format(Locale.US, "#REQ-%05d", s.size() + 1);
+                commitNewRequest(reqId, tenantUid, tenantUnit, problemType, location, description);
+            });
+        });
+    }
+
+    private void commitNewRequest(String reqId, String tenantUid, String tenantUnit,
+                                  String problemType, String location, String description) {
         String dateStr = new SimpleDateFormat("MMM d, yyyy", Locale.US).format(new Date()) + " | " + tenantUnit;
         String title = problemType + " in " + location;
+        List<String> photoDataList = new ArrayList<>(selectedPhotoBase64Map.values());
 
         Map<String, Object> requestData = new HashMap<>();
         requestData.put("id", reqId);
@@ -145,6 +233,9 @@ public class SubmitRequestActivity extends AppCompatActivity {
         requestData.put("tenantUnit", tenantUnit);
         requestData.put("tenantUid", tenantUid);
         requestData.put("notes", "");
+        requestData.put("photoUris", photoDataList);
+        requestData.put("rating", 0);
+        requestData.put("ratingFeedback", "");
         requestData.put("timestamp", FieldValue.serverTimestamp());
 
         db.collection("requests")

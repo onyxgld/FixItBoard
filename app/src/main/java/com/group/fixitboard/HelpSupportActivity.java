@@ -18,15 +18,30 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.cardview.widget.CardView;
 import androidx.core.content.ContextCompat;
 
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.firestore.FieldValue;
+import com.google.firebase.firestore.FirebaseFirestore;
+
+import java.util.HashMap;
+import java.util.Map;
+
 public class HelpSupportActivity extends AppCompatActivity {
 
     private LinearLayout container;
     private String currentSubPage = "MENU";
+    private boolean isAdmin = false;
+    private FirebaseFirestore db;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_help_support);
+
+        db = FirebaseFirestore.getInstance();
+        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
+        isAdmin = getIntent().getBooleanExtra("IS_ADMIN", false)
+                || (user != null && user.getEmail() != null && user.getEmail().toLowerCase().startsWith("admin"));
 
         container = findViewById(R.id.containerHelpSupport);
         ImageButton btnBack = findViewById(R.id.btnBack);
@@ -49,13 +64,16 @@ public class HelpSupportActivity extends AppCompatActivity {
 
         container.addView(buildHeaderCard(
                 android.R.drawable.ic_menu_call,
-                "How can we help you?",
-                "Find an answer or report an issue"
+                isAdmin ? "Admin Help & Support" : "How can we help you?",
+                isAdmin ? "Manage portal guides or contact technical support" : "Find an answer or report an issue"
         ));
 
         container.addView(buildMenuRow("Frequently Asked Questions", v -> showFaq()));
         container.addView(buildDivider());
-        container.addView(buildMenuRow("Contact Administrator", v -> showContactAdmin()));
+        container.addView(buildMenuRow(
+                isAdmin ? "Contact Technical Support" : "Contact Administrator",
+                v -> showContactSupport()
+        ));
         container.addView(buildDivider());
         container.addView(buildMenuRow("Report a Problem", v -> showReportProblem()));
         container.addView(buildDivider());
@@ -67,35 +85,52 @@ public class HelpSupportActivity extends AppCompatActivity {
 
         container.addView(buildHeaderCard(
                 android.R.drawable.ic_menu_help,
-                "Frequently Asked Questions",
+                isAdmin ? "Admin Portal FAQ" : "Frequently Asked Questions",
                 null
         ));
 
-        addSectionBlock("How do I report a maintenance issue?",
-                "Go to New Request on your dashboard, select the problem type, enter the location and description, and submit your request.");
-        addSectionBlock("How can I check my request?",
-                "Open Requests from the bottom navigation bar to view the real-time status and admin updates of your reported issue.");
-        addSectionBlock("How long will my request take?",
-                "Response times depend on the type and urgency of the issue. You will receive updates through the Notification tab.");
-        addSectionBlock("What if my issue is urgent?",
-                "For emergencies that may cause immediate danger or serious property damage, contact your administrator immediately.");
+        if (isAdmin) {
+            addSectionBlock("How do I update a maintenance request status?",
+                    "Open any request card from the Admin Dashboard, select Pending, In Progress, or Completed, add optional admin notes, and tap Save Changes.");
+            addSectionBlock("How do I assign tenants to units?",
+                    "Go to Admin Profile → Settings → User Management to assign units/roles, or open Property Management to update unit occupancy.");
+            addSectionBlock("How do tenants receive updates?",
+                    "Whenever you save a status update on a request, FixItBoard automatically sends a real-time notification to the tenant's Notification tab.");
+            addSectionBlock("How do I manage building units?",
+                    "Open Admin Settings → Property Management and tap the + icon to add new units or tap an existing unit card to update its status.");
+        } else {
+            addSectionBlock("How do I report a maintenance issue?",
+                    "Go to New Request on your dashboard, select the problem type, enter the location and description, and submit your request.");
+            addSectionBlock("How can I check my request?",
+                    "Open Requests from the bottom navigation bar to view the real-time status and admin updates of your reported issue.");
+            addSectionBlock("How long will my request take?",
+                    "Response times depend on the type and urgency of the issue. You will receive updates through the Notification tab.");
+            addSectionBlock("What if my issue is urgent?",
+                    "For emergencies that may cause immediate danger or serious property damage, contact your administrator immediately.");
+        }
     }
 
-    private void showContactAdmin() {
+    private void showContactSupport() {
         currentSubPage = "CONTACT";
         container.removeAllViews();
 
         container.addView(buildHeaderCard(
                 android.R.drawable.ic_menu_myplaces,
-                "Contact Administrator",
+                isAdmin ? "Contact Technical Support" : "Contact Administrator",
                 null
         ));
 
-        addSectionBlock("Contact Admin",
-                "Need help with your rental unit or have a concern? Contact your property administrator.");
-
-        addSectionBlock("Administrator Details",
-                "• Name: Property Admin\n• Email: admin@fixitboard.com\n• Phone: +63 912 345 6789\n• Office Hours: Monday – Friday, 8:00 AM – 5:00 PM");
+        if (isAdmin) {
+            addSectionBlock("System & Developer Support",
+                    "Need technical assistance with Firebase sync, user permissions, or portal configuration? Reach out to the FixItBoard support team.");
+            addSectionBlock("Support Details",
+                    "• Team: FixItBoard Technical Support\n• Email: support@fixitboard.com\n• Hotline: +63 917 800 1234\n• Support Hours: Monday – Saturday, 8:00 AM – 6:00 PM");
+        } else {
+            addSectionBlock("Contact Admin",
+                    "Need help with your rental unit or have a concern? Contact your property administrator.");
+            addSectionBlock("Administrator Details",
+                    "• Name: Property Admin\n• Email: admin@fixitboard.com\n• Phone: +63 912 345 6789\n• Office Hours: Monday – Friday, 8:00 AM – 5:00 PM");
+        }
 
         float d = getResources().getDisplayMetrics().density;
         Button btnEnquiry = new Button(this);
@@ -108,7 +143,7 @@ public class HelpSupportActivity extends AppCompatActivity {
                 LinearLayout.LayoutParams.MATCH_PARENT, (int) (48 * d));
         params.topMargin = (int) (12 * d);
         btnEnquiry.setLayoutParams(params);
-        btnEnquiry.setOnClickListener(v -> showEnquiryDialog());
+        btnEnquiry.setOnClickListener(v -> showEnquiryDialog("Enquiry"));
         container.addView(btnEnquiry);
     }
 
@@ -139,11 +174,11 @@ public class HelpSupportActivity extends AppCompatActivity {
                 LinearLayout.LayoutParams.MATCH_PARENT, (int) (48 * d));
         params.topMargin = (int) (12 * d);
         btnReport.setLayoutParams(params);
-        btnReport.setOnClickListener(v -> showEnquiryDialog());
+        btnReport.setOnClickListener(v -> showEnquiryDialog("App Problem Report"));
         container.addView(btnReport);
     }
 
-    private void showEnquiryDialog() {
+    private void showEnquiryDialog(String category) {
         EditText etMsg = new EditText(this);
         etMsg.setHint("Type your message here...");
         etMsg.setMinLines(3);
@@ -151,10 +186,31 @@ public class HelpSupportActivity extends AppCompatActivity {
         etMsg.setPadding(pad, pad, pad, pad);
 
         new AlertDialog.Builder(this)
-                .setTitle("Send Message to Admin")
+                .setTitle(isAdmin ? "Send Support Ticket" : "Send Message to Admin")
                 .setView(etMsg)
-                .setPositiveButton("Send", (d, w) ->
-                        Toast.makeText(this, "Your message has been sent to the administrator.", Toast.LENGTH_SHORT).show())
+                .setPositiveButton("Send", (d, w) -> {
+                    String msg = etMsg.getText().toString().trim();
+                    if (msg.isEmpty()) {
+                        Toast.makeText(this, "Please enter a message first.", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+
+                    FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
+                    Map<String, Object> ticket = new HashMap<>();
+                    ticket.put("senderUid", user != null ? user.getUid() : "guest");
+                    ticket.put("senderEmail", user != null && user.getEmail() != null ? user.getEmail() : "unknown");
+                    ticket.put("role", isAdmin ? "admin" : "tenant");
+                    ticket.put("category", category);
+                    ticket.put("message", msg);
+                    ticket.put("status", "Open");
+                    ticket.put("timestamp", FieldValue.serverTimestamp());
+
+                    db.collection("support_tickets").add(ticket)
+                            .addOnSuccessListener(ref ->
+                                    Toast.makeText(this, "Submitted! Ticket ID: " + ref.getId().substring(0, 6).toUpperCase(), Toast.LENGTH_SHORT).show())
+                            .addOnFailureListener(e ->
+                                    Toast.makeText(this, "Failed to send: " + e.getMessage(), Toast.LENGTH_SHORT).show());
+                })
                 .setNegativeButton("Cancel", null)
                 .show();
     }

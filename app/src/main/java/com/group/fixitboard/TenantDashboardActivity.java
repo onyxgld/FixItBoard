@@ -1,14 +1,17 @@
 package com.group.fixitboard;
 
 import android.content.Intent;
+import android.graphics.Color;
+import android.graphics.Typeface;
 import android.os.Bundle;
+import android.view.ViewGroup;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.cardview.widget.CardView;
+import androidx.core.content.ContextCompat;
 
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
@@ -18,9 +21,12 @@ import com.google.firebase.firestore.ListenerRegistration;
 
 public class TenantDashboardActivity extends AppCompatActivity {
 
-    private TextView tvCountPending, tvCountInProgress, tvCountCompleted;
+    private TextView tvWelcomeTenant, tvCountPending, tvCountInProgress, tvCountCompleted;
+    private TextView tvAnnouncementSnippet;
     private FirebaseFirestore db;
     private ListenerRegistration summaryListener;
+    private ListenerRegistration profileListener;
+    private ListenerRegistration announcementListener;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -29,7 +35,7 @@ public class TenantDashboardActivity extends AppCompatActivity {
 
         db = FirebaseFirestore.getInstance();
 
-        TextView tvWelcomeTenant = findViewById(R.id.tvWelcomeTenant);
+        tvWelcomeTenant = findViewById(R.id.tvWelcomeTenant);
         tvCountPending = findViewById(R.id.tvCountPending);
         tvCountInProgress = findViewById(R.id.tvCountInProgress);
         tvCountCompleted = findViewById(R.id.tvCountCompleted);
@@ -48,6 +54,8 @@ public class TenantDashboardActivity extends AppCompatActivity {
         if (tenantName != null && !tenantName.trim().isEmpty()) {
             tvWelcomeTenant.setText("Hello " + tenantName + "!");
         }
+
+        injectAnnouncementBanner();
 
         CardView cardNewRequest = findViewById(R.id.cardNewRequest);
         CardView cardHouseRules = findViewById(R.id.cardHouseRules);
@@ -79,7 +87,89 @@ public class TenantDashboardActivity extends AppCompatActivity {
         navProfile.setOnClickListener(v ->
                 startActivity(new Intent(TenantDashboardActivity.this, TenantProfileActivity.class)));
 
+        listenToProfileGreeting();
         listenToRequestSummary();
+        listenToAnnouncement();
+    }
+
+    private void injectAnnouncementBanner() {
+        if (tvWelcomeTenant == null || !(tvWelcomeTenant.getParent() instanceof ViewGroup)) return;
+        ViewGroup parent = (ViewGroup) tvWelcomeTenant.getParent();
+        float d = getResources().getDisplayMetrics().density;
+        int navy = ContextCompat.getColor(this, R.color.navy_primary);
+
+        CardView bannerCard = new CardView(this);
+        LinearLayout.LayoutParams cardLp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        cardLp.topMargin = (int) (10 * d);
+        cardLp.bottomMargin = (int) (14 * d);
+        bannerCard.setLayoutParams(cardLp);
+        bannerCard.setCardBackgroundColor(Color.parseColor("#EEF4FF"));
+        bannerCard.setRadius(12 * d);
+        bannerCard.setCardElevation(1 * d);
+
+        LinearLayout inner = new LinearLayout(this);
+        inner.setOrientation(LinearLayout.VERTICAL);
+        int pad = (int) (14 * d);
+        inner.setPadding(pad, pad, pad, pad);
+
+        TextView tvTitle = new TextView(this);
+        tvTitle.setText("Property Announcement  ›");
+        tvTitle.setTextColor(navy);
+        tvTitle.setTextSize(13f);
+        tvTitle.setTypeface(null, Typeface.BOLD);
+        inner.addView(tvTitle);
+
+        tvAnnouncementSnippet = new TextView(this);
+        tvAnnouncementSnippet.setText("Please review the house rules and submit maintenance concerns through FixIt Board.");
+        tvAnnouncementSnippet.setTextColor(ContextCompat.getColor(this, R.color.text_gray));
+        tvAnnouncementSnippet.setTextSize(12f);
+        tvAnnouncementSnippet.setMaxLines(2);
+        LinearLayout.LayoutParams snipLp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        snipLp.topMargin = (int) (4 * d);
+        tvAnnouncementSnippet.setLayoutParams(snipLp);
+        inner.addView(tvAnnouncementSnippet);
+
+        bannerCard.addView(inner);
+        bannerCard.setOnClickListener(v -> PropertyAnnouncementHelper.showAnnouncementDialog(this, false));
+
+        int insertIndex = parent.indexOfChild(tvWelcomeTenant) + 1;
+        parent.addView(bannerCard, insertIndex);
+    }
+
+    private void listenToAnnouncement() {
+        announcementListener = db.collection("announcements").document("latest")
+                .addSnapshotListener((doc, error) -> {
+                    if (error != null || doc == null || !doc.exists() || tvAnnouncementSnippet == null) return;
+                    String msg = doc.getString("message");
+                    if (msg != null && !msg.trim().isEmpty()) {
+                        tvAnnouncementSnippet.setText(msg.trim());
+                    }
+                });
+    }
+
+    private void listenToProfileGreeting() {
+        FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
+        if (currentUser == null) return;
+
+        profileListener = db.collection("users").document(currentUser.getUid())
+                .addSnapshotListener((doc, error) -> {
+                    if (error != null || doc == null || !doc.exists()) return;
+
+                    String name = doc.getString("name");
+                    String unit = doc.getString("unit");
+
+                    if (name != null && !name.trim().isEmpty()) {
+                        String display = name.trim();
+                        if (unit != null && !unit.trim().isEmpty()
+                                && !"Unassigned".equalsIgnoreCase(unit.trim())
+                                && !display.toLowerCase().contains(unit.trim().toLowerCase())) {
+                            display += " - " + unit.trim();
+                        }
+                        tvWelcomeTenant.setText("Hello " + display + "!");
+                    }
+                });
     }
 
     private void listenToRequestSummary() {
@@ -115,20 +205,11 @@ public class TenantDashboardActivity extends AppCompatActivity {
         if (summaryListener != null) {
             summaryListener.remove();
         }
-    }
-
-    private void showProfileLogoutDialog() {
-        new AlertDialog.Builder(this)
-                .setTitle("Tenant Profile")
-                .setMessage("Would you like to log out of FixItBoard?")
-                .setPositiveButton("Log Out", (dialog, which) -> {
-                    FirebaseAuth.getInstance().signOut();
-                    Intent intent = new Intent(TenantDashboardActivity.this, MainActivity.class);
-                    intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-                    startActivity(intent);
-                    finish();
-                })
-                .setNegativeButton("Cancel", null)
-                .show();
+        if (profileListener != null) {
+            profileListener.remove();
+        }
+        if (announcementListener != null) {
+            announcementListener.remove();
+        }
     }
 }

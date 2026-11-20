@@ -13,6 +13,7 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        ThemeHelper.applySavedTheme(this);
         super.onCreate(savedInstanceState);
 
         FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();

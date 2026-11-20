@@ -6,6 +6,7 @@ import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.view.Gravity;
+import android.view.ViewGroup;
 import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.RelativeLayout;
@@ -48,11 +49,13 @@ public class AdminDashboardActivity extends AppCompatActivity {
     private LinearLayout containerAdminRequests;
     private TextView tabAll, tabPending, tabInProgress, tabDone;
     private TextView tvCountPending, tvCountInProgress, tvCountCompleted;
+    private TextView tvAdminAnnouncementPreview;
     private final List<AdminRequestItem> adminRequests = new ArrayList<>();
     private String currentFilter = "All";
 
     private FirebaseFirestore db;
     private ListenerRegistration firestoreListener;
+    private ListenerRegistration announcementListener;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -73,6 +76,8 @@ public class AdminDashboardActivity extends AppCompatActivity {
 
         btnLogout.setOnClickListener(v -> showAdminLogoutDialog());
 
+        injectAdminAnnouncementBanner();
+
         tabAll.setOnClickListener(v -> applyFilter("All"));
         tabPending.setOnClickListener(v -> applyFilter("Pending"));
         tabInProgress.setOnClickListener(v -> applyFilter("In Progress"));
@@ -89,7 +94,64 @@ public class AdminDashboardActivity extends AppCompatActivity {
         navProfile.setOnClickListener(v ->
                 startActivity(new Intent(AdminDashboardActivity.this, AdminProfileActivity.class)));
 
+        listenToAnnouncement();
         listenToRequests();
+    }
+
+    private void injectAdminAnnouncementBanner() {
+        if (containerAdminRequests == null || !(containerAdminRequests.getParent() instanceof ViewGroup)) return;
+        ViewGroup parent = (ViewGroup) containerAdminRequests.getParent();
+        float d = getResources().getDisplayMetrics().density;
+        int navy = ContextCompat.getColor(this, R.color.navy_primary);
+
+        CardView bannerCard = new CardView(this);
+        LinearLayout.LayoutParams cardLp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        cardLp.bottomMargin = (int) (14 * d);
+        bannerCard.setLayoutParams(cardLp);
+        bannerCard.setCardBackgroundColor(Color.parseColor("#EEF4FF"));
+        bannerCard.setRadius(12 * d);
+        bannerCard.setCardElevation(1 * d);
+
+        LinearLayout inner = new LinearLayout(this);
+        inner.setOrientation(LinearLayout.VERTICAL);
+        int pad = (int) (14 * d);
+        inner.setPadding(pad, pad, pad, pad);
+
+        TextView tvTitle = new TextView(this);
+        tvTitle.setText("Property Announcement (Tap to edit)  ›");
+        tvTitle.setTextColor(navy);
+        tvTitle.setTextSize(13f);
+        tvTitle.setTypeface(null, Typeface.BOLD);
+        inner.addView(tvTitle);
+
+        tvAdminAnnouncementPreview = new TextView(this);
+        tvAdminAnnouncementPreview.setText("Please review the house rules and submit maintenance concerns through FixIt Board.");
+        tvAdminAnnouncementPreview.setTextColor(ContextCompat.getColor(this, R.color.text_gray));
+        tvAdminAnnouncementPreview.setTextSize(12f);
+        tvAdminAnnouncementPreview.setMaxLines(2);
+        LinearLayout.LayoutParams snipLp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        snipLp.topMargin = (int) (4 * d);
+        tvAdminAnnouncementPreview.setLayoutParams(snipLp);
+        inner.addView(tvAdminAnnouncementPreview);
+
+        bannerCard.addView(inner);
+        bannerCard.setOnClickListener(v -> PropertyAnnouncementHelper.showAnnouncementDialog(this, true));
+
+        int insertIndex = parent.indexOfChild(containerAdminRequests);
+        parent.addView(bannerCard, insertIndex);
+    }
+
+    private void listenToAnnouncement() {
+        announcementListener = db.collection("announcements").document("latest")
+                .addSnapshotListener((doc, error) -> {
+                    if (error != null || doc == null || !doc.exists() || tvAdminAnnouncementPreview == null) return;
+                    String msg = doc.getString("message");
+                    if (msg != null && !msg.trim().isEmpty()) {
+                        tvAdminAnnouncementPreview.setText(msg.trim());
+                    }
+                });
     }
 
     private void listenToRequests() {
@@ -131,6 +193,9 @@ public class AdminDashboardActivity extends AppCompatActivity {
         super.onDestroy();
         if (firestoreListener != null) {
             firestoreListener.remove();
+        }
+        if (announcementListener != null) {
+            announcementListener.remove();
         }
     }
 

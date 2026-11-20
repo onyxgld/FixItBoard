@@ -14,15 +14,23 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.cardview.widget.CardView;
 import androidx.core.content.ContextCompat;
 
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
+
 public class PrivacyPolicyActivity extends AppCompatActivity {
 
     private LinearLayout container;
     private String currentSubPage = "MENU";
+    private boolean isAdmin = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_privacy_policy);
+
+        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
+        isAdmin = getIntent().getBooleanExtra("IS_ADMIN", false)
+                || (user != null && user.getEmail() != null && user.getEmail().toLowerCase().startsWith("admin"));
 
         container = findViewById(R.id.containerPrivacyPolicy);
         ImageButton btnBack = findViewById(R.id.btnBack);
@@ -44,8 +52,10 @@ public class PrivacyPolicyActivity extends AppCompatActivity {
 
         container.addView(buildHeaderCard(
                 android.R.drawable.ic_secure,
-                "Your Privacy Matters",
-                "Learn how Fixit Board collects, uses, and protects your personal information."
+                isAdmin ? "Privacy Policy & Admin Terms" : "Your Privacy Matters",
+                isAdmin
+                        ? "Data protection guidelines, terms of service, and administrator responsibilities."
+                        : "Learn how Fixit Board collects, uses, and protects your personal information."
         ));
 
         container.addView(buildMenuRow("Information We Collect", v -> showInfoCollect()));
@@ -58,6 +68,11 @@ public class PrivacyPolicyActivity extends AppCompatActivity {
         container.addView(buildDivider());
         container.addView(buildMenuRow("Your Privacy Rights", v -> showPrivacyRights()));
         container.addView(buildDivider());
+
+        if (isAdmin) {
+            container.addView(buildMenuRow("Terms of Service & Admin Responsibilities", v -> showAdminTerms()));
+            container.addView(buildDivider());
+        }
     }
 
     private void showInfoCollect() {
@@ -110,6 +125,19 @@ public class PrivacyPolicyActivity extends AppCompatActivity {
                 "• Access your personal information\n• Correct inaccurate information\n• Request deletion of your information\n• Ask how your information is being used\n• Withdraw certain permissions or consent");
         addSection("Need help with your privacy?",
                 "Contact the Fixit Board administrator or privacy contact.");
+    }
+
+    private void showAdminTerms() {
+        currentSubPage = "ADMIN_TERMS";
+        container.removeAllViews();
+        container.addView(buildHeaderCard(android.R.drawable.ic_menu_agenda, "Terms of Service & Admin Responsibilities", null));
+
+        addSection("Authorized Administrative Access",
+                "Administrator accounts are granted elevated privileges solely for managing property units, tenant maintenance tickets, and official building communications.");
+        addSection("Confidentiality & Data Handling",
+                "• Do not export, share, or disclose tenant contact numbers, unit assignments, or maintenance records outside authorized property operations.\n• Ensure status updates and admin notes remain professional and accurate.");
+        addSection("Account Security",
+                "Administrators must safeguard login credentials, log out on shared devices, and promptly report any suspected unauthorized access.");
     }
 
     private CardView buildHeaderCard(int iconRes, String title, String subtitle) {
