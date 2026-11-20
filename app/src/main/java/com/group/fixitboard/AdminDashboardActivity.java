@@ -86,7 +86,8 @@ public class AdminDashboardActivity extends AppCompatActivity {
         navHome.setOnClickListener(v -> applyFilter("All"));
         navRequests.setOnClickListener(v -> applyFilter("Pending"));
         navHistory.setOnClickListener(v -> applyFilter("Completed"));
-        navProfile.setOnClickListener(v -> showAdminLogoutDialog());
+        navProfile.setOnClickListener(v ->
+                startActivity(new Intent(AdminDashboardActivity.this, AdminProfileActivity.class)));
 
         listenToRequests();
     }

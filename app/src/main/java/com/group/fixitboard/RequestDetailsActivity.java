@@ -14,10 +14,8 @@ import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 
-import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
 
@@ -178,11 +176,11 @@ public class RequestDetailsActivity extends AppCompatActivity {
 
         navProfile.setOnClickListener(v -> {
             if (isAdmin) {
-                showProfileLogoutDialog();
+                startActivity(new Intent(this, AdminProfileActivity.class));
             } else {
                 startActivity(new Intent(this, TenantProfileActivity.class));
-                finish();
             }
+            finish();
         });
     }
 
@@ -230,20 +228,5 @@ public class RequestDetailsActivity extends AppCompatActivity {
             tvStatusBadge.setTextColor(Color.parseColor("#2E7D32"));
         }
         tvStatusBadge.setBackground(badgeBg);
-    }
-
-    private void showProfileLogoutDialog() {
-        new AlertDialog.Builder(this)
-                .setTitle("Admin Profile")
-                .setMessage("Would you like to log out of FixItBoard?")
-                .setPositiveButton("Log Out", (dialog, which) -> {
-                    FirebaseAuth.getInstance().signOut();
-                    Intent intent = new Intent(this, MainActivity.class);
-                    intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-                    startActivity(intent);
-                    finish();
-                })
-                .setNegativeButton("Cancel", null)
-                .show();
     }
 }
