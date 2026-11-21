@@ -172,26 +172,6 @@
             android:textSize="15sp"
             android:textStyle="bold" />
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center_horizontal"
-            android:layout_marginVertical="12dp"
-            android:text="or"
-            android:textColor="@color/text_gray"
-            android:textSize="13sp" />
-
-        <Button
-            android:id="@+id/btnGoogleAuth"
-            android:layout_width="match_parent"
-            android:layout_height="52dp"
-            android:backgroundTint="@color/navy_primary"
-            android:text="G   Continue with Google"
-            android:textAllCaps="false"
-            android:textColor="@color/white"
-            android:textSize="15sp"
-            android:textStyle="bold" />
-
         <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"

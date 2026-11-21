@@ -68,7 +68,6 @@ public class TenantLoginActivity extends AppCompatActivity {
         tvForgotPassword = findViewById(R.id.tvForgotPassword);
 
         btnSubmitAuth = findViewById(R.id.btnSubmitAuth);
-        Button btnGoogleAuth = findViewById(R.id.btnGoogleAuth);
         tvSwitchPrompt = findViewById(R.id.tvSwitchPrompt);
         tvSwitchAction = findViewById(R.id.tvSwitchAction);
 
@@ -87,9 +86,6 @@ public class TenantLoginActivity extends AppCompatActivity {
         });
 
         btnSubmitAuth.setOnClickListener(v -> handleAuthSubmit());
-
-        btnGoogleAuth.setOnClickListener(v ->
-                Toast.makeText(this, "Please sign in with your registered Tenant Email & Password.", Toast.LENGTH_SHORT).show());
     }
 
     private void injectPropertyCodeField() {

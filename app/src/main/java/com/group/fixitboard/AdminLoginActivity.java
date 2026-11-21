@@ -11,47 +11,44 @@ import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.SetOptions;
+
+import java.util.HashMap;
+import java.util.Map;
 
 public class AdminLoginActivity extends AppCompatActivity {
 
     private EditText etAdminEmail, etAdminPassword;
     private Button btnAdminLogin;
     private FirebaseAuth mAuth;
+    private FirebaseFirestore db;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        ThemeHelper.applySavedTheme(this);
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_admin_login);
 
         mAuth = FirebaseAuth.getInstance();
+        db = FirebaseFirestore.getInstance();
 
         ImageButton btnBack = findViewById(R.id.btnBack);
         etAdminEmail = findViewById(R.id.etAdminEmail);
         etAdminPassword = findViewById(R.id.etAdminPassword);
         TextView tvForgotPassword = findViewById(R.id.tvForgotPassword);
         btnAdminLogin = findViewById(R.id.btnAdminLogin);
-        Button btnAdminGoogleLogin = findViewById(R.id.btnAdminGoogleLogin);
 
         btnBack.setOnClickListener(v -> finish());
 
         tvForgotPassword.setOnClickListener(v -> {
-            String email = etAdminEmail.getText().toString().trim();
-            if (email.isEmpty()) {
-                etAdminEmail.setError("Enter admin email first");
-                etAdminEmail.requestFocus();
-                return;
-            }
-            mAuth.sendPasswordResetEmail(email)
-                    .addOnSuccessListener(unused ->
-                            Toast.makeText(this, "Admin password reset link sent to " + email, Toast.LENGTH_SHORT).show())
-                    .addOnFailureListener(e ->
-                            Toast.makeText(this, "Error: " + e.getMessage(), Toast.LENGTH_SHORT).show());
+            Intent intent = new Intent(this, ForgotPasswordActivity.class);
+            intent.putExtra("PREFILL_EMAIL", etAdminEmail.getText().toString().trim());
+            startActivity(intent);
         });
 
         btnAdminLogin.setOnClickListener(v -> handleAdminLogin());
-
-        btnAdminGoogleLogin.setOnClickListener(v ->
-                Toast.makeText(this, "Please sign in with your official Admin Email & Password.", Toast.LENGTH_SHORT).show());
     }
 
     private void handleAdminLogin() {
@@ -70,22 +67,64 @@ public class AdminLoginActivity extends AppCompatActivity {
             return;
         }
 
-        if (!email.toLowerCase().startsWith("admin")) {
-            etAdminEmail.setError("Unauthorized: Only admin accounts can access this portal");
-            etAdminEmail.requestFocus();
-            return;
-        }
-
         btnAdminLogin.setEnabled(false);
         btnAdminLogin.setText("Signing in...");
 
         mAuth.signInWithEmailAndPassword(email, password)
-                .addOnSuccessListener(authResult -> goToAdminDashboard())
+                .addOnSuccessListener(authResult -> {
+                    FirebaseUser user = authResult.getUser();
+                    if (user == null) {
+                        resetLoginButton();
+                        return;
+                    }
+
+                    boolean isDefaultAdminEmail = email.toLowerCase().startsWith("admin");
+
+                    db.collection("users").document(user.getUid()).get()
+                            .addOnSuccessListener(doc -> {
+                                String role = doc.exists() ? doc.getString("role") : null;
+                                if (isDefaultAdminEmail || "admin".equalsIgnoreCase(role)) {
+                                    ensureAdminProfileDoc(user, email);
+                                    goToAdminDashboard();
+                                } else {
+                                    mAuth.signOut();
+                                    resetLoginButton();
+                                    etAdminEmail.setError("Unauthorized: Only admin accounts can access this portal");
+                                    etAdminEmail.requestFocus();
+                                }
+                            })
+                            .addOnFailureListener(e -> {
+                                if (isDefaultAdminEmail) {
+                                    goToAdminDashboard();
+                                } else {
+                                    mAuth.signOut();
+                                    resetLoginButton();
+                                    Toast.makeText(this, "Failed to verify admin role: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                                }
+                            });
+                })
                 .addOnFailureListener(e -> {
-                    btnAdminLogin.setEnabled(true);
-                    btnAdminLogin.setText("Log In as Admin");
+                    resetLoginButton();
                     Toast.makeText(this, "Admin login failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
                 });
+    }
+
+    private void ensureAdminProfileDoc(FirebaseUser user, String email) {
+        Map<String, Object> adminData = new HashMap<>();
+        adminData.put("uid", user.getUid());
+        adminData.put("email", email);
+        adminData.put("role", "admin");
+        if (user.getDisplayName() != null && !user.getDisplayName().trim().isEmpty()) {
+            adminData.put("name", user.getDisplayName().trim());
+        } else {
+            adminData.put("name", "Property Admin");
+        }
+        db.collection("users").document(user.getUid()).set(adminData, SetOptions.merge());
+    }
+
+    private void resetLoginButton() {
+        btnAdminLogin.setEnabled(true);
+        btnAdminLogin.setText("Log In");
     }
 
     private void goToAdminDashboard() {

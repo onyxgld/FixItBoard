@@ -6,7 +6,6 @@ import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.view.Gravity;
-import android.view.ViewGroup;
 import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.RelativeLayout;
@@ -18,11 +17,11 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.cardview.widget.CardView;
 import androidx.core.content.ContextCompat;
 
+import com.google.firebase.Timestamp;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.ListenerRegistration;
-import com.google.firebase.firestore.Query;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -31,8 +30,10 @@ public class AdminDashboardActivity extends AppCompatActivity {
 
     private static class AdminRequestItem {
         String docId, id, title, problemType, location, description, date, status, tenantUnit, notes;
+        long sortTime;
 
-        AdminRequestItem(String docId, String id, String title, String problemType, String location, String description, String date, String status, String tenantUnit, String notes) {
+        AdminRequestItem(String docId, String id, String title, String problemType, String location,
+                         String description, String date, String status, String tenantUnit, String notes, long sortTime) {
             this.docId = docId;
             this.id = id;
             this.title = title;
@@ -43,13 +44,16 @@ public class AdminDashboardActivity extends AppCompatActivity {
             this.status = status;
             this.tenantUnit = tenantUnit;
             this.notes = notes;
+            this.sortTime = sortTime;
         }
     }
 
     private LinearLayout containerAdminRequests;
+    private CardView announcementBannerCard;
     private TextView tabAll, tabPending, tabInProgress, tabDone;
     private TextView tvCountPending, tvCountInProgress, tvCountCompleted;
     private TextView tvAdminAnnouncementPreview;
+    private String latestAnnouncementText = "Please review the house rules and submit maintenance concerns through FixIt Board.";
     private final List<AdminRequestItem> adminRequests = new ArrayList<>();
     private String currentFilter = "All";
 
@@ -59,6 +63,7 @@ public class AdminDashboardActivity extends AppCompatActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        ThemeHelper.applySavedTheme(this);
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_admin_dashboard);
 
@@ -74,33 +79,38 @@ public class AdminDashboardActivity extends AppCompatActivity {
         tvCountInProgress = findViewById(R.id.tvCountInProgress);
         tvCountCompleted = findViewById(R.id.tvCountCompleted);
 
-        btnLogout.setOnClickListener(v -> showAdminLogoutDialog());
+        if (btnLogout != null) {
+            btnLogout.setOnClickListener(v -> showAdminLogoutDialog());
+        }
 
-        injectAdminAnnouncementBanner();
+        announcementBannerCard = buildAdminAnnouncementBanner();
+        if (containerAdminRequests != null && announcementBannerCard != null) {
+            containerAdminRequests.addView(announcementBannerCard, 0);
+        }
 
-        tabAll.setOnClickListener(v -> applyFilter("All"));
-        tabPending.setOnClickListener(v -> applyFilter("Pending"));
-        tabInProgress.setOnClickListener(v -> applyFilter("In Progress"));
-        tabDone.setOnClickListener(v -> applyFilter("Completed"));
+        if (tabAll != null) tabAll.setOnClickListener(v -> applyFilter("All"));
+        if (tabPending != null) tabPending.setOnClickListener(v -> applyFilter("Pending"));
+        if (tabInProgress != null) tabInProgress.setOnClickListener(v -> applyFilter("In Progress"));
+        if (tabDone != null) tabDone.setOnClickListener(v -> applyFilter("Completed"));
 
         LinearLayout navHome = findViewById(R.id.navHome);
         LinearLayout navRequests = findViewById(R.id.navRequests);
         LinearLayout navHistory = findViewById(R.id.navHistory);
         LinearLayout navProfile = findViewById(R.id.navProfile);
 
-        navHome.setOnClickListener(v -> applyFilter("All"));
-        navRequests.setOnClickListener(v -> applyFilter("Pending"));
-        navHistory.setOnClickListener(v -> applyFilter("Completed"));
-        navProfile.setOnClickListener(v ->
-                startActivity(new Intent(AdminDashboardActivity.this, AdminProfileActivity.class)));
+        if (navHome != null) navHome.setOnClickListener(v -> applyFilter("All"));
+        if (navRequests != null) navRequests.setOnClickListener(v -> applyFilter("Pending"));
+        if (navHistory != null) navHistory.setOnClickListener(v -> applyFilter("Completed"));
+        if (navProfile != null) {
+            navProfile.setOnClickListener(v ->
+                    startActivity(new Intent(AdminDashboardActivity.this, AdminProfileActivity.class)));
+        }
 
         listenToAnnouncement();
         listenToRequests();
     }
 
-    private void injectAdminAnnouncementBanner() {
-        if (containerAdminRequests == null || !(containerAdminRequests.getParent() instanceof ViewGroup)) return;
-        ViewGroup parent = (ViewGroup) containerAdminRequests.getParent();
+    private CardView buildAdminAnnouncementBanner() {
         float d = getResources().getDisplayMetrics().density;
         int navy = ContextCompat.getColor(this, R.color.navy_primary);
 
@@ -109,7 +119,9 @@ public class AdminDashboardActivity extends AppCompatActivity {
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         cardLp.bottomMargin = (int) (14 * d);
         bannerCard.setLayoutParams(cardLp);
-        bannerCard.setCardBackgroundColor(Color.parseColor("#EEF4FF"));
+        bannerCard.setCardBackgroundColor(ThemeHelper.isDarkMode(this)
+                ? Color.parseColor("#182842")
+                : Color.parseColor("#EEF4FF"));
         bannerCard.setRadius(12 * d);
         bannerCard.setCardElevation(1 * d);
 
@@ -126,7 +138,7 @@ public class AdminDashboardActivity extends AppCompatActivity {
         inner.addView(tvTitle);
 
         tvAdminAnnouncementPreview = new TextView(this);
-        tvAdminAnnouncementPreview.setText("Please review the house rules and submit maintenance concerns through FixIt Board.");
+        tvAdminAnnouncementPreview.setText(latestAnnouncementText);
         tvAdminAnnouncementPreview.setTextColor(ContextCompat.getColor(this, R.color.text_gray));
         tvAdminAnnouncementPreview.setTextSize(12f);
         tvAdminAnnouncementPreview.setMaxLines(2);
@@ -139,24 +151,25 @@ public class AdminDashboardActivity extends AppCompatActivity {
         bannerCard.addView(inner);
         bannerCard.setOnClickListener(v -> PropertyAnnouncementHelper.showAnnouncementDialog(this, true));
 
-        int insertIndex = parent.indexOfChild(containerAdminRequests);
-        parent.addView(bannerCard, insertIndex);
+        return bannerCard;
     }
 
     private void listenToAnnouncement() {
         announcementListener = db.collection("announcements").document("latest")
                 .addSnapshotListener((doc, error) -> {
-                    if (error != null || doc == null || !doc.exists() || tvAdminAnnouncementPreview == null) return;
+                    if (error != null || doc == null || !doc.exists()) return;
                     String msg = doc.getString("message");
                     if (msg != null && !msg.trim().isEmpty()) {
-                        tvAdminAnnouncementPreview.setText(msg.trim());
+                        latestAnnouncementText = msg.trim();
+                        if (tvAdminAnnouncementPreview != null) {
+                            tvAdminAnnouncementPreview.setText(latestAnnouncementText);
+                        }
                     }
                 });
     }
 
     private void listenToRequests() {
         firestoreListener = db.collection("requests")
-                .orderBy("timestamp", Query.Direction.DESCENDING)
                 .addSnapshotListener((snapshots, error) -> {
                     if (error != null) {
                         Toast.makeText(this, "Error loading requests: " + error.getMessage(), Toast.LENGTH_SHORT).show();
@@ -177,11 +190,24 @@ public class AdminDashboardActivity extends AppCompatActivity {
                             String tenantUnit = doc.getString("tenantUnit") != null ? doc.getString("tenantUnit") : "Tenant";
                             String notes = doc.getString("notes") != null ? doc.getString("notes") : "";
 
+                            long sortTime = 0L;
+                            Object tsObj = doc.get("timestamp");
+                            if (tsObj instanceof Timestamp) {
+                                sortTime = ((Timestamp) tsObj).toDate().getTime();
+                            }
+
                             adminRequests.add(new AdminRequestItem(
-                                    docId, id, title, problemType, location, description, date, status, tenantUnit, notes
+                                    docId, id, title, problemType, location, description, date, status, tenantUnit, notes, sortTime
                             ));
                         }
                     }
+
+                    adminRequests.sort((a, b) -> {
+                        if (b.sortTime != a.sortTime) {
+                            return Long.compare(b.sortTime, a.sortTime);
+                        }
+                        return b.id.compareToIgnoreCase(a.id);
+                    });
 
                     updateSummaryCounts();
                     applyFilter(currentFilter);
@@ -202,13 +228,13 @@ public class AdminDashboardActivity extends AppCompatActivity {
     private void updateSummaryCounts() {
         int pending = 0, inProgress = 0, completed = 0;
         for (AdminRequestItem item : adminRequests) {
-            if ("Pending".equals(item.status)) pending++;
-            else if ("In Progress".equals(item.status)) inProgress++;
-            else if ("Completed".equals(item.status)) completed++;
+            if ("Pending".equalsIgnoreCase(item.status)) pending++;
+            else if ("In Progress".equalsIgnoreCase(item.status)) inProgress++;
+            else if ("Completed".equalsIgnoreCase(item.status)) completed++;
         }
-        tvCountPending.setText(String.valueOf(pending));
-        tvCountInProgress.setText(String.valueOf(inProgress));
-        tvCountCompleted.setText(String.valueOf(completed));
+        if (tvCountPending != null) tvCountPending.setText(String.valueOf(pending));
+        if (tvCountInProgress != null) tvCountInProgress.setText(String.valueOf(inProgress));
+        if (tvCountCompleted != null) tvCountCompleted.setText(String.valueOf(completed));
     }
 
     private void applyFilter(String filter) {
@@ -218,11 +244,16 @@ public class AdminDashboardActivity extends AppCompatActivity {
         updateTabStyle(tabInProgress, filter.equals("In Progress"));
         updateTabStyle(tabDone, filter.equals("Completed"));
 
+        if (containerAdminRequests == null) return;
         containerAdminRequests.removeAllViews();
+
+        if (announcementBannerCard != null) {
+            containerAdminRequests.addView(announcementBannerCard);
+        }
 
         int shownCount = 0;
         for (AdminRequestItem item : adminRequests) {
-            if (filter.equals("All") || item.status.equals(filter)) {
+            if (filter.equals("All") || item.status.equalsIgnoreCase(filter)) {
                 containerAdminRequests.addView(createRequestCard(item));
                 shownCount++;
             }
@@ -241,10 +272,11 @@ public class AdminDashboardActivity extends AppCompatActivity {
     }
 
     private void updateTabStyle(TextView tab, boolean active) {
+        if (tab == null) return;
         int navy = ContextCompat.getColor(this, R.color.navy_primary);
         if (active) {
             tab.setBackgroundColor(navy);
-            tab.setTextColor(Color.WHITE);
+            tab.setTextColor(ThemeHelper.isDarkMode(this) ? Color.parseColor("#0C1728") : Color.WHITE);
             tab.setTypeface(null, Typeface.BOLD);
         } else {
             tab.setBackgroundResource(R.drawable.bg_input_outline);
@@ -264,7 +296,7 @@ public class AdminDashboardActivity extends AppCompatActivity {
                 LinearLayout.LayoutParams.WRAP_CONTENT);
         cardParams.bottomMargin = (int) (12 * d);
         card.setLayoutParams(cardParams);
-        card.setCardBackgroundColor(Color.WHITE);
+        card.setCardBackgroundColor(ContextCompat.getColor(this, R.color.white));
         card.setRadius(12 * d);
         card.setCardElevation(2 * d);
 
@@ -290,10 +322,10 @@ public class AdminDashboardActivity extends AppCompatActivity {
 
         GradientDrawable badgeBg = new GradientDrawable();
         badgeBg.setCornerRadius(8 * d);
-        if ("In Progress".equals(item.status)) {
+        if ("In Progress".equalsIgnoreCase(item.status)) {
             badgeBg.setColor(Color.parseColor("#FFF3E0"));
             tvBadge.setTextColor(Color.parseColor("#E65100"));
-        } else if ("Pending".equals(item.status)) {
+        } else if ("Pending".equalsIgnoreCase(item.status)) {
             badgeBg.setColor(Color.parseColor("#FFEBEE"));
             tvBadge.setTextColor(Color.parseColor("#C62828"));
         } else {

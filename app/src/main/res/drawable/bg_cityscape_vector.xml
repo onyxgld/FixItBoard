@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="360dp"
+    android:height="130dp"
+    android:viewportWidth="360"
+    android:viewportHeight="130">
+
+    <!-- Back layer buildings (subtle depth) -->
+    <path
+        android:fillColor="#223656"
+        android:pathData="M0,130 L0,78 L24,78 L24,62 L48,62 L48,84 L74,84 L74,48 L106,48 L106,72 L134,72 L134,42 L168,42 L168,68 L196,68 L196,36 L228,36 L228,74 L258,74 L258,52 L292,52 L292,76 L322,76 L322,58 L360,58 L360,130 Z" />
+
+    <!-- Foreground cityscape silhouette -->
+    <path
+        android:fillColor="@color/navy_primary"
+        android:pathData="M0,130 L0,92 L18,92 L18,72 L42,72 L42,96 L64,96 L64,60 L92,60 L92,86 L118,86 L118,54 L146,54 L146,82 L176,82 L176,46 L204,46 L204,78 L234,78 L234,62 L266,62 L266,88 L296,88 L296,66 L330,66 L330,84 L360,84 L360,130 Z" />
+</vector>
